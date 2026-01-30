@@ -30,9 +30,9 @@ func main() {
 	mux.Handle("/app/", http.StripPrefix("/app", apiConfig.middlewareMetricsInc(http.FileServer(http.Dir(filePathRoot)))))
 	// mux.Handle("/assets/logo.png", http.FileServer(http.Dir(".")))
 	// custom handler for readiness endpoint
-	mux.HandleFunc("/healthz", handlerReadiness)
-	mux.HandleFunc("/metrics", apiConfig.handlerRequestCounter)
-	mux.HandleFunc("/reset", apiConfig.handlerReset)
+	mux.HandleFunc("GET /healthz", handlerReadiness)
+	mux.HandleFunc("GET /metrics", apiConfig.handlerRequestCounter)
+	mux.HandleFunc("POST /reset", apiConfig.handlerReset)
 
 	server := http.Server{
 		Addr:    ":" + port,
