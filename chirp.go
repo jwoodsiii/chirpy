@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"strings"
 )
 
 func handlerValidateChirp(w http.ResponseWriter, r *http.Request) {
@@ -14,8 +15,8 @@ func handlerValidateChirp(w http.ResponseWriter, r *http.Request) {
 	}
 
 	type responseBody struct {
-		Valid bool   `json:"valid, omitempty"`
-		Error string `json:"error, omitempty"`
+		CleanedBody string `json:"cleaned_body, omitempty"`
+		Error       string `json:"error, omitempty"`
 	}
 
 	dat, err := io.ReadAll(r.Body)
@@ -29,15 +30,21 @@ func handlerValidateChirp(w http.ResponseWriter, r *http.Request) {
 		respondWithError(w, 500, "couldn't unmarshal parameters")
 		return
 	}
-	// handle chirp
+	// handle chirp len
 	if len(params.Body) > 140 {
 		respondWithError(w, 400, "chirp is too long")
 		return
 	}
-
+	// handle profane
 	respondWithJson(w, 200, responseBody{
-		Valid: true,
+		CleanedBody: handleProfanity(params.Body),
 	})
+}
+
+func handleProfanity(chirp string) string {
+	r := strings.NewReplacer("kerfuffle", "****", "sharbert", "****", "fornax", "****")
+	c := strings.Fields(strings.ToLower(chirp))
+	return r.Replace(strings.Join(c, " "))
 
 }
 
