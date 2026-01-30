@@ -1,8 +1,8 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
-	"strconv"
 	"sync/atomic"
 )
 
@@ -30,9 +30,10 @@ func main() {
 	mux.Handle("/app/", http.StripPrefix("/app", apiConfig.middlewareMetricsInc(http.FileServer(http.Dir(filePathRoot)))))
 	// mux.Handle("/assets/logo.png", http.FileServer(http.Dir(".")))
 	// custom handler for readiness endpoint
-	mux.HandleFunc("GET /healthz", handlerReadiness)
-	mux.HandleFunc("GET /metrics", apiConfig.handlerRequestCounter)
-	mux.HandleFunc("POST /reset", apiConfig.handlerReset)
+	mux.HandleFunc("GET /api/healthz", handlerReadiness)
+	mux.HandleFunc("GET /admin/metrics", apiConfig.handlerRequestCounter)
+	mux.HandleFunc("POST /admin/reset", apiConfig.handlerReset)
+	mux.HandleFunc("POST /api/validate_chirp", handlerValidateChirp)
 
 	server := http.Server{
 		Addr:    ":" + port,
@@ -44,7 +45,15 @@ func main() {
 }
 
 func (cfg *apiConfig) handlerRequestCounter(w http.ResponseWriter, r *http.Request) {
-	w.Header().Add("Content-Type", "text/plain; charset=utf-8")
+	w.Header().Add("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("Hits: " + strconv.Itoa(int(cfg.fileserverHits.Load()))))
+	res := fmt.Sprintf(
+		`<html>
+  			<body>
+     			<h1>Welcome, Chirpy Admin</h1>
+        			<p>Chirpy has been visited %d times!</p>
+           </body>
+        </html>`,
+		int(cfg.fileserverHits.Load()))
+	w.Write([]byte(res))
 }
