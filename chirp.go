@@ -42,10 +42,17 @@ func handlerValidateChirp(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleProfanity(chirp string) string {
-	r := strings.NewReplacer("kerfuffle", "****", "sharbert", "****", "fornax", "****")
-	c := strings.Fields(strings.ToLower(chirp))
-	return r.Replace(strings.Join(c, " "))
-
+	// kerfuffle
+	// sharbert
+	// fornax
+	c := strings.Fields(chirp)
+	for i, v := range c {
+		switch strings.ToLower(v) {
+		case "kerfuffle", "sharbert", "fornax":
+			c[i] = "****"
+		}
+	}
+	return strings.Join(c, " ")
 }
 
 func respondWithJson(w http.ResponseWriter, code int, payload any) error {
