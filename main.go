@@ -5,8 +5,10 @@ import (
 )
 
 func main() {
-	// http multiplexer that matches url of requests against list of registered patterns and calls handler for closest match
 	mux := http.NewServeMux()
+
+	mux.Handle("/", http.FileServer(http.Dir(".")))
+	mux.Handle("/assets/logo.png", http.FileServer(http.Dir(".")))
 	server := http.Server{
 		Addr:    "localhost:8080",
 		Handler: mux,
