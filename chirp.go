@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"io"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -10,6 +11,67 @@ import (
 	"github.com/google/uuid"
 	"github.com/jwoodsiii/chirpy/internal/database"
 )
+
+type Chirp struct {
+	Id        uuid.UUID `json:"id"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+	Body      string    `json:"body"`
+	UserId    uuid.UUID `json:"user_id"`
+}
+
+func (cfg *apiConfig) handlerGetChirp(w http.ResponseWriter, r *http.Request) {
+	defer r.Body.Close()
+
+	id := r.PathValue("chirpID")
+	log.Printf("ID before uuid parse: %s", id)
+	if id == "" {
+		respondWithError(w, http.StatusBadRequest, "missing chirp ID")
+		return
+	}
+
+	type responseBody struct {
+		Chirp
+	}
+
+	chirp, err := cfg.db.GetChirp(r.Context(), uuid.MustParse(id))
+	if err != nil {
+		log.Printf("Database error: %v attempting to pull id: %s", err, uuid.MustParse(id))
+		respondWithError(w, http.StatusNotFound, "Couldn't retrieve chirp")
+		return
+	}
+
+	respondWithJson(w, http.StatusOK, responseBody{
+		Chirp{
+			Id:        chirp.ID,
+			CreatedAt: chirp.CreatedAt,
+			UpdatedAt: chirp.UpdatedAt,
+			Body:      chirp.Body,
+			UserId:    chirp.UserID,
+		},
+	})
+}
+
+func (cfg *apiConfig) handlerGetChirps(w http.ResponseWriter, r *http.Request) {
+	dbChirps, err := cfg.db.GetChirps(r.Context())
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Couldn't retrieve chirps")
+		return
+	}
+
+	chirps := []Chirp{}
+	for _, dbChirp := range dbChirps {
+		chirps = append(chirps, Chirp{
+			Id:        dbChirp.ID,
+			CreatedAt: dbChirp.CreatedAt,
+			UpdatedAt: dbChirp.UpdatedAt,
+			UserId:    dbChirp.UserID,
+			Body:      dbChirp.Body,
+		})
+	}
+
+	respondWithJson(w, http.StatusOK, chirps)
+}
 
 func (cfg *apiConfig) handlerCreateChirp(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
@@ -20,11 +82,7 @@ func (cfg *apiConfig) handlerCreateChirp(w http.ResponseWriter, r *http.Request)
 	}
 
 	type responseBody struct {
-		Id        uuid.UUID `json:"id"`
-		CreatedAt time.Time `json:"created_at"`
-		UpdatedAt time.Time `json:"updated_at"`
-		Body      string    `json:"body"`
-		UserId    uuid.UUID `json:"user_id"`
+		Chirp
 	}
 
 	dat, err := io.ReadAll(r.Body)
@@ -52,39 +110,15 @@ func (cfg *apiConfig) handlerCreateChirp(w http.ResponseWriter, r *http.Request)
 	}
 
 	// handle profane
-	respondWithJson(w, 201, responseBody{
-		Id:        uuid.New(),
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
-		Body:      chirp.Body,
-		UserId:    chirp.UserID,
+	respondWithJson(w, http.StatusCreated, responseBody{
+		Chirp{
+			Id:        chirp.ID,
+			CreatedAt: time.Now(),
+			UpdatedAt: time.Now(),
+			Body:      chirp.Body,
+			UserId:    chirp.UserID,
+		},
 	})
-}
-
-func handlerValidateChirp(w http.ResponseWriter, r *http.Request) {
-	defer r.Body.Close()
-
-	type requestBody struct {
-		Body string `json:"body"`
-	}
-
-	type responseBody struct {
-		CleanedBody string `json:"cleaned_body, omitempty"`
-		Error       string `json:"error, omitempty"`
-	}
-
-	dat, err := io.ReadAll(r.Body)
-	if err != nil {
-		respondWithError(w, 500, "couldn't read request")
-		return
-	}
-
-	var params requestBody
-	if err := json.Unmarshal(dat, &params); err != nil {
-		respondWithError(w, 500, "couldn't unmarshal parameters")
-		return
-	}
-
 }
 
 func handleProfanity(chirp string) string {
