@@ -17,6 +17,7 @@ type apiConfig struct {
 	fileserverHits atomic.Int32
 	db             *database.Queries
 	platform       string
+	jwtSecret      string
 }
 
 func (cfg *apiConfig) middlewareMetricsInc(next http.Handler) http.Handler {
@@ -31,6 +32,11 @@ func main() {
 
 	dbUrl := os.Getenv("DB_URL")
 	platform := os.Getenv("PLATFORM")
+	jwt := os.Getenv("JWT_SECRET")
+	if jwt == "" {
+		log.Fatal("JWT_SECRET environment variable is not set")
+	}
+
 	db, err := sql.Open("postgres", dbUrl)
 	if err != nil {
 		log.Fatalf("Failed to connect to db: %v", err)
@@ -42,6 +48,7 @@ func main() {
 		fileserverHits: atomic.Int32{},
 		db:             dbQueries,
 		platform:       platform,
+		jwtSecret:      jwt,
 	}
 
 	const filePathRoot = "."

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jwoodsiii/chirpy/internal/auth"
 	"github.com/jwoodsiii/chirpy/internal/database"
 )
 
@@ -77,12 +78,23 @@ func (cfg *apiConfig) handlerCreateChirp(w http.ResponseWriter, r *http.Request)
 	defer r.Body.Close()
 
 	type requestBody struct {
-		Body   string    `json:"body"`
-		UserId uuid.UUID `json:"user_id"`
+		Body string `json:"body"`
 	}
 
 	type responseBody struct {
 		Chirp
+	}
+
+	tokenString, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, "invalid token")
+		return
+	}
+
+	userId, err := auth.ValidateJWT(tokenString, cfg.jwtSecret)
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, "invalid token")
+		return
 	}
 
 	dat, err := io.ReadAll(r.Body)
@@ -103,7 +115,7 @@ func (cfg *apiConfig) handlerCreateChirp(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	chirp, err := cfg.db.CreateChirp(r.Context(), database.CreateChirpParams{Body: handleProfanity(params.Body), UserID: params.UserId})
+	chirp, err := cfg.db.CreateChirp(r.Context(), database.CreateChirpParams{Body: handleProfanity(params.Body), UserID: userId})
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "error creating chirp")
 		return

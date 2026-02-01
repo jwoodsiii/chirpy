@@ -3,6 +3,9 @@ package auth
 import (
 	"errors"
 	"fmt"
+	"log"
+	"net/http"
+	"strings"
 	"time"
 
 	"github.com/alexedwards/argon2id"
@@ -16,6 +19,18 @@ const (
 	// TokenTypeAccess -
 	TokenTypeAccess TokenType = "chirpy-access"
 )
+
+func GetBearerToken(headers http.Header) (string, error) {
+	bearer := headers.Get("Authorization")
+	if bearer == "" {
+		return "", fmt.Errorf("missing Authorization header")
+	}
+
+	tokenString := strings.TrimPrefix(bearer, "Bearer ")
+	log.Printf("tokentest: %s", tokenString)
+
+	return tokenString, nil
+}
 
 // HashPassword -
 func HashPassword(password string) (string, error) {
@@ -57,7 +72,7 @@ func ValidateJWT(tokenString, tokenSecret string) (uuid.UUID, error) {
 	token, err := jwt.ParseWithClaims(
 		tokenString,
 		&claimsStruct,
-		func(token *jwt.Token) (interface{}, error) { return []byte(tokenSecret), nil },
+		func(token *jwt.Token) (any, error) { return []byte(tokenSecret), nil },
 	)
 	if err != nil {
 		return uuid.Nil, err
