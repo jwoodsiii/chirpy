@@ -5,6 +5,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"sort"
 	"strings"
 	"time"
 
@@ -90,7 +91,11 @@ func (cfg *apiConfig) handlerGetChirp(w http.ResponseWriter, r *http.Request) {
 func (cfg *apiConfig) handlerGetChirps(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 	author := r.URL.Query().Get("author_id")
-	log.Printf("author id: %s", author)
+	sortDirection := "asc"
+	sortDirectionParam := r.URL.Query().Get("sort")
+	if sortDirectionParam == "desc" {
+		sortDirection = "desc"
+	}
 
 	chirps := []Chirp{}
 	if author != "" {
@@ -108,6 +113,13 @@ func (cfg *apiConfig) handlerGetChirps(w http.ResponseWriter, r *http.Request) {
 					Body:      dbChirp.Body,
 				})
 			}
+			sort.Slice(chirps, func(i, j int) bool {
+				if sortDirection == "desc" {
+					return chirps[i].CreatedAt.After(chirps[j].CreatedAt)
+				}
+				return chirps[i].CreatedAt.Before(chirps[j].CreatedAt)
+			})
+
 			respondWithJson(w, http.StatusOK, chirps)
 			return
 		}
@@ -128,6 +140,13 @@ func (cfg *apiConfig) handlerGetChirps(w http.ResponseWriter, r *http.Request) {
 			Body:      dbChirp.Body,
 		})
 	}
+
+	sort.Slice(chirps, func(i, j int) bool {
+		if sortDirection == "desc" {
+			return chirps[i].CreatedAt.After(chirps[j].CreatedAt)
+		}
+		return chirps[i].CreatedAt.Before(chirps[j].CreatedAt)
+	})
 
 	respondWithJson(w, http.StatusOK, chirps)
 }
