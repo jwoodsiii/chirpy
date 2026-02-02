@@ -13,6 +13,64 @@ import (
 	"github.com/jwoodsiii/chirpy/internal/database"
 )
 
+func (cfg *apiConfig) handlerUserUpdates(w http.ResponseWriter, r *http.Request) {
+	defer r.Body.Close()
+
+	type requestBody struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}
+
+	type responseBody struct {
+		Id        uuid.UUID `json:"id"`
+		CreatedAt time.Time `json:"created_at"`
+		UpdatedAt time.Time `json:"updated_at"`
+		Email     string    `json:"email"`
+	}
+
+	token, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, err.Error())
+		return
+	}
+
+	userID, err := auth.ValidateJWT(token, cfg.jwtSecret)
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, err.Error())
+		return
+	}
+
+	dat, err := io.ReadAll(r.Body)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, err.Error())
+	}
+
+	var params requestBody
+	if err := json.Unmarshal(dat, &params); err != nil {
+		respondWithError(w, http.StatusInternalServerError, err.Error())
+	}
+
+	hashed, err := auth.HashPassword(params.Password)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	user, err := cfg.db.UpdateUser(r.Context(), database.UpdateUserParams{ID: userID, Email: params.Email, HashedPassword: hashed})
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, err.Error())
+		return
+	}
+
+	respondWithJson(w, http.StatusOK, responseBody{
+		Id:        user.ID,
+		CreatedAt: user.CreatedAt,
+		UpdatedAt: user.UpdatedAt,
+		Email:     user.Email,
+	})
+
+}
+
 func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 

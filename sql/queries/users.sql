@@ -14,3 +14,9 @@ select * from users where email=$1;
 
 -- name: DeleteUsers :exec
 delete from users;
+
+-- name: UpdateUser :one
+update users
+set email=$2, hashed_password=$3, updated_at=NOW()
+where id=$1
+returning *;
