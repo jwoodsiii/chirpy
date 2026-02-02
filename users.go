@@ -13,6 +13,42 @@ import (
 	"github.com/jwoodsiii/chirpy/internal/database"
 )
 
+func (cfg *apiConfig) handlerUpgradeChirpy(w http.ResponseWriter, r *http.Request) {
+	defer r.Body.Close()
+
+	type requestBody struct {
+		Event string `json:"event"`
+		Data  struct {
+			UserID string `json:"user_id"`
+		} `json:"data"`
+	}
+
+	dat, err := io.ReadAll(r.Body)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	var params requestBody
+	if err := json.Unmarshal(dat, &params); err != nil {
+		respondWithError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	if params.Event != "user.upgraded" {
+		respondWithError(w, http.StatusNoContent, "Event not supported")
+		return
+	}
+
+	_, err = cfg.db.UpgradeUser(r.Context(), uuid.MustParse(params.Data.UserID))
+	if err != nil {
+		respondWithError(w, http.StatusNotFound, err.Error())
+	}
+
+	respondWithJson(w, http.StatusNoContent, "")
+
+}
+
 func (cfg *apiConfig) handlerUserUpdates(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 
@@ -84,6 +120,7 @@ func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
 		CreatedAt    time.Time `json:"created_at"`
 		UpdatedAt    time.Time `json:"updated_at"`
 		Email        string    `json:"email"`
+		IsChirpyRed  bool      `json:"is_chirpy_red"`
 		Token        string    `json:"token"`
 		RefreshToken string    `json:"refresh_token"`
 	}
@@ -139,6 +176,7 @@ func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
 		CreatedAt:    user.CreatedAt,
 		UpdatedAt:    user.UpdatedAt,
 		Email:        user.Email,
+		IsChirpyRed:  user.IsChirpyRed,
 		Token:        jwt,
 		RefreshToken: refreshToken.Token,
 	})
@@ -153,10 +191,11 @@ func (cfg *apiConfig) handlerCreateUser(w http.ResponseWriter, r *http.Request) 
 	}
 
 	type responseBody struct {
-		Id        uuid.UUID `json:"id"`
-		CreatedAt time.Time `json:"created_at"`
-		UpdatedAt time.Time `json:"updated_at"`
-		Email     string    `json:"email"`
+		Id          uuid.UUID `json:"id"`
+		CreatedAt   time.Time `json:"created_at"`
+		UpdatedAt   time.Time `json:"updated_at"`
+		Email       string    `json:"email"`
+		IsChirpyRed bool      `json:"is_chirpy_red"`
 	}
 
 	dat, err := io.ReadAll(r.Body)
@@ -186,9 +225,10 @@ func (cfg *apiConfig) handlerCreateUser(w http.ResponseWriter, r *http.Request) 
 	}
 
 	respondWithJson(w, 201, responseBody{
-		Id:        user.ID,
-		CreatedAt: user.CreatedAt,
-		UpdatedAt: user.UpdatedAt,
-		Email:     user.Email,
+		Id:          user.ID,
+		CreatedAt:   user.CreatedAt,
+		UpdatedAt:   user.UpdatedAt,
+		Email:       user.Email,
+		IsChirpyRed: user.IsChirpyRed,
 	})
 }

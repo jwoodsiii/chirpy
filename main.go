@@ -71,6 +71,8 @@ func main() {
 	mux.HandleFunc("GET /api/chirps/{chirpID}", apiConfig.handlerGetChirp)
 	mux.HandleFunc("DELETE /api/chirps/{chirpID}", apiConfig.handlerDeleteChirp)
 
+	mux.HandleFunc("POST /api/polka/webhooks", apiConfig.handlerUpgradeChirpy)
+
 	server := http.Server{
 		Addr:    ":" + port,
 		Handler: mux,
