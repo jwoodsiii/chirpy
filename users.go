@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"time"
 
@@ -16,17 +17,17 @@ func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 
 	type requestBody struct {
-		Email            string        `json:"email"`
-		Password         string        `json:"password"`
-		ExpiresInSeconds time.Duration `json:"expires_in,omitempty"`
+		Email    string `json:"email"`
+		Password string `json:"password"`
 	}
 
 	type responseBody struct {
-		Id        uuid.UUID `json:"id"`
-		CreatedAt time.Time `json:"created_at"`
-		UpdatedAt time.Time `json:"updated_at"`
-		Email     string    `json:"email"`
-		Token     string    `json:"token"`
+		Id           uuid.UUID `json:"id"`
+		CreatedAt    time.Time `json:"created_at"`
+		UpdatedAt    time.Time `json:"updated_at"`
+		Email        string    `json:"email"`
+		Token        string    `json:"token"`
+		RefreshToken string    `json:"refresh_token"`
 	}
 
 	dat, err := io.ReadAll(r.Body)
@@ -42,9 +43,6 @@ func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	expirationTime := time.Hour
-	if params.ExpiresInSeconds > 0 && params.ExpiresInSeconds < 3600 {
-		expirationTime = time.Duration(params.ExpiresInSeconds) * time.Second
-	}
 
 	user, err := cfg.db.GetUserByEmail(r.Context(), params.Email)
 	if err != nil {
@@ -58,18 +56,33 @@ func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token, err := auth.MakeJWT(user.ID, cfg.jwtSecret, expirationTime)
+	jwt, err := auth.MakeJWT(user.ID, cfg.jwtSecret, expirationTime)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Couldn't create access JWT")
 		return
 	}
 
+	refresh, err := auth.MakeRefreshToken()
+	if err != nil {
+		log.Printf("Auth error: %v", err)
+		respondWithError(w, http.StatusInternalServerError, "Couldn't create refresh token")
+		return
+	}
+
+	refreshToken, err := cfg.db.CreateToken(r.Context(), database.CreateTokenParams{Token: refresh, UserID: user.ID})
+	if err != nil {
+		log.Printf("Database error: %v", err)
+		respondWithError(w, http.StatusInternalServerError, "Couldn't create refresh token")
+		return
+	}
+
 	respondWithJson(w, http.StatusOK, responseBody{
-		Id:        user.ID,
-		CreatedAt: user.CreatedAt,
-		UpdatedAt: user.UpdatedAt,
-		Email:     user.Email,
-		Token:     token,
+		Id:           user.ID,
+		CreatedAt:    user.CreatedAt,
+		UpdatedAt:    user.UpdatedAt,
+		Email:        user.Email,
+		Token:        jwt,
+		RefreshToken: refreshToken.Token,
 	})
 }
 
