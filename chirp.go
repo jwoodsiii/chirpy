@@ -21,6 +21,40 @@ type Chirp struct {
 	UserId    uuid.UUID `json:"user_id"`
 }
 
+func (cfg *apiConfig) handlerDeleteChirp(w http.ResponseWriter, r *http.Request) {
+	r.Body.Close()
+
+	token, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		respondWithError(w, 401, err.Error())
+	}
+
+	userID, err := auth.ValidateJWT(token, cfg.jwtSecret)
+	if err != nil {
+		respondWithError(w, 403, err.Error())
+		return
+	}
+
+	id := r.PathValue("chirpID")
+
+	chirp, err := cfg.db.GetChirp(r.Context(), uuid.MustParse(id))
+	if err != nil {
+		respondWithError(w, http.StatusNotFound, err.Error())
+	}
+
+	if chirp.UserID != userID {
+		respondWithError(w, http.StatusForbidden, "not authorized to delete this chirp")
+	}
+	_, err = cfg.db.DeleteChirp(r.Context(), database.DeleteChirpParams{ID: uuid.MustParse(id), UserID: userID})
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	respondWithJson(w, http.StatusNoContent, "")
+
+}
+
 func (cfg *apiConfig) handlerGetChirp(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 

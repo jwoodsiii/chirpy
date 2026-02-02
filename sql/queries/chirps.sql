@@ -14,3 +14,7 @@ select * from chirps order by created_at asc;
 
 -- name: GetChirp :one
 select * from chirps where id=$1;
+
+-- name: DeleteChirp :one
+delete from chirps where id=$1 and user_id=$2
+returning *;
