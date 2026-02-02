@@ -23,6 +23,12 @@ func (cfg *apiConfig) handlerUpgradeChirpy(w http.ResponseWriter, r *http.Reques
 		} `json:"data"`
 	}
 
+	_, err := auth.GetAuthValueFromHeader(r.Header, "ApiKey")
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, err.Error())
+		return
+	}
+
 	dat, err := io.ReadAll(r.Body)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, err.Error())

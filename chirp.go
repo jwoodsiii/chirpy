@@ -88,13 +88,37 @@ func (cfg *apiConfig) handlerGetChirp(w http.ResponseWriter, r *http.Request) {
 }
 
 func (cfg *apiConfig) handlerGetChirps(w http.ResponseWriter, r *http.Request) {
+	defer r.Body.Close()
+	author := r.URL.Query().Get("author_id")
+	log.Printf("author id: %s", author)
+
+	chirps := []Chirp{}
+	if author != "" {
+		dbChirps, err := cfg.db.GetChirpsByAuthor(r.Context(), uuid.MustParse(author))
+		if err != nil {
+			respondWithError(w, http.StatusInternalServerError, "Couldn't retrieve chirps")
+			return
+		} else {
+			for _, dbChirp := range dbChirps {
+				chirps = append(chirps, Chirp{
+					Id:        dbChirp.ID,
+					CreatedAt: dbChirp.CreatedAt,
+					UpdatedAt: dbChirp.UpdatedAt,
+					UserId:    dbChirp.UserID,
+					Body:      dbChirp.Body,
+				})
+			}
+			respondWithJson(w, http.StatusOK, chirps)
+			return
+		}
+	}
+
 	dbChirps, err := cfg.db.GetChirps(r.Context())
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Couldn't retrieve chirps")
 		return
 	}
 
-	chirps := []Chirp{}
 	for _, dbChirp := range dbChirps {
 		chirps = append(chirps, Chirp{
 			Id:        dbChirp.ID,
